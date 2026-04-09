@@ -472,7 +472,7 @@ jobs:
       uses: actions/cache@v5
       with:
         path: build-ios
-        key: ios-cmake-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'ios/Info.plist') }}
+        key: ios-cmake-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'ios/Info.plist', '.github/workflows/ci.yml') }}
         restore-keys: |
           ios-cmake-${{ runner.os }}-
 
@@ -482,7 +482,7 @@ jobs:
         cmake \
           -DCMAKE_SYSTEM_NAME=iOS \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
-          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+          -DCMAKE_OSX_ARCHITECTURES="arm64" \
           -DAMPLITRON_VERSION="${{ steps.version.outputs.version }}" \
           -DFETCHCONTENT_UPDATES_DISCONNECTED=ON \
           -G Xcode \
@@ -497,7 +497,7 @@ jobs:
           -configuration Release \
           -sdk iphonesimulator \
           -derivedDataPath ios-derived \
-          ONLY_ACTIVE_ARCH=NO \
+          ONLY_ACTIVE_ARCH=YES \
           CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
           build 2>&1 | tee /tmp/xcode.log | xcpretty --color; \
         STATUS=${PIPESTATUS[0]}; \
@@ -508,11 +508,11 @@ jobs:
         APP=$(find ios-derived/Build/Products -name "Amplitron.app" -type d | head -1)
         echo "App bundle: $APP"
 
-        # Binary must exist and be a valid Mach-O (arm64 or x86_64 simulator slice)
+        # Binary must exist and be a valid Mach-O (arm64 simulator slice)
         BINARY="$APP/Amplitron"
         file "$BINARY"
-        lipo -info "$BINARY" | grep -E "arm64|x86_64" \
-          || { echo "Expected arm64/x86_64 slices not found"; exit 1; }
+        lipo -info "$BINARY" | grep -E "arm64" \
+          || { echo "Expected arm64 slice not found"; exit 1; }
 
         # Info.plist must be valid and have the correct bundle ID
         plutil -lint "$APP/Info.plist"
