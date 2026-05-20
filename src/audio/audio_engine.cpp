@@ -21,20 +21,20 @@ AudioEngine::~AudioEngine() {
 
 // --- Serialization Methods ---
 
-nlohmann::json AudioEngine::serialize() const {
-    // Thread safety: Lock mutex while reading effect chain
+
+nlohmann::json AudioEngine::serialize() {
     std::lock_guard<std::mutex> lock(effect_mutex_);
-    
     nlohmann::json j;
-    j["input_gain"] = input_gain_;
+    
+    // Read atomic variables safely
+    j["input_gain"] = input_gain_.load(std::memory_order_relaxed);
     
     auto effects_array = nlohmann::json::array();
     for (const auto& fx : effects_) {
         if (fx) {
             effects_array.push_back({
-                {"name", fx->get_name()}, 
-                {"enabled", fx->is_enabled()},
-                {"params", fx->get_params()} // Must be implemented in your Effect base class
+                {"name", fx->name()}, // Corrected from get_name()
+                {"params", fx->get_params()}
             });
         }
     }
@@ -43,22 +43,18 @@ nlohmann::json AudioEngine::serialize() const {
 }
 
 void AudioEngine::deserialize(const nlohmann::json& j) {
-    // Thread safety: Lock mutex while modifying effect chain
     std::lock_guard<std::mutex> lock(effect_mutex_);
     
     if (j.contains("input_gain")) {
-        input_gain_ = j["input_gain"];
+        set_input_gain(j["input_gain"]);
     }
     
     if (j.contains("effects")) {
         for (const auto& fx_data : j["effects"]) {
             std::string name = fx_data["name"];
-            bool enabled = fx_data["enabled"];
-            
             for (auto& fx : effects_) {
-                if (fx->get_name() == name) {
-                    fx->set_enabled(enabled);
-                    fx->set_params(fx_data["params"]); // Must be implemented in your Effect base class
+                if (fx && std::string(fx->name()) == name) {
+                    fx->set_params(fx_data["params"]);
                 }
             }
         }
