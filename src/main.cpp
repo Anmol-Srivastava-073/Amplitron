@@ -117,12 +117,17 @@ int main(int argc, char* argv[]) {
 
     if (sessionManager.hasUnsavedSession()) {
         if (promptRestoreSession()) {
-            engine.deserialize(sessionManager.loadSession());
+            try {
+                nlohmann::json savedState = sessionManager.loadSession();
+                engine.deserialize(savedState);
+            } catch (const nlohmann::json::parse_error& e) {
+                std::cerr << "Autosave file corrupted. Discarding." << std::endl;
+                sessionManager.clearSession();
+            }
         } else {
             sessionManager.clearSession();
         }
     }
-
     if (std::filesystem::exists("presets")) {
         Amplitron::PresetManager::set_presets_dir("presets");
     }
