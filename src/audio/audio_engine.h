@@ -39,9 +39,9 @@ public:
     ~AudioEngine();
 
     /** @brief serialize and deserialize method signatures to AudioEngine class definition */
-    nlohmann::json serialize() const;
+    
+    nlohmann::json serialize();
     void deserialize(const nlohmann::json& j);
-
     /** @brief Initialize the audio back-end. @return true on success. */
     bool initialize();
 
