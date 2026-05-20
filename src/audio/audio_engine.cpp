@@ -2,6 +2,7 @@
 #include "audio/audio_backend.h"
 #include <iostream>
 #include <algorithm>
+#include <nlohmann/json.hpp>
 
 namespace Amplitron {
 
@@ -17,6 +18,54 @@ AudioEngine::~AudioEngine() {
     destroy_audio_backend(backend_);
     backend_ = nullptr;
 }
+
+// --- Serialization Methods ---
+
+nlohmann::json AudioEngine::serialize() const {
+    // Thread safety: Lock mutex while reading effect chain
+    std::lock_guard<std::mutex> lock(effect_mutex_);
+    
+    nlohmann::json j;
+    j["input_gain"] = input_gain_;
+    
+    auto effects_array = nlohmann::json::array();
+    for (const auto& fx : effects_) {
+        if (fx) {
+            effects_array.push_back({
+                {"name", fx->get_name()}, 
+                {"enabled", fx->is_enabled()},
+                {"params", fx->get_params()} // Must be implemented in your Effect base class
+            });
+        }
+    }
+    j["effects"] = effects_array;
+    return j;
+}
+
+void AudioEngine::deserialize(const nlohmann::json& j) {
+    // Thread safety: Lock mutex while modifying effect chain
+    std::lock_guard<std::mutex> lock(effect_mutex_);
+    
+    if (j.contains("input_gain")) {
+        input_gain_ = j["input_gain"];
+    }
+    
+    if (j.contains("effects")) {
+        for (const auto& fx_data : j["effects"]) {
+            std::string name = fx_data["name"];
+            bool enabled = fx_data["enabled"];
+            
+            for (auto& fx : effects_) {
+                if (fx->get_name() == name) {
+                    fx->set_enabled(enabled);
+                    fx->set_params(fx_data["params"]); // Must be implemented in your Effect base class
+                }
+            }
+        }
+    }
+}
+
+// --- Existing Methods ---
 
 void AudioEngine::set_buffer_size(int size) {
     size = std::max(MIN_BUFFER_SIZE, std::min(MAX_BUFFER_SIZE, size));
