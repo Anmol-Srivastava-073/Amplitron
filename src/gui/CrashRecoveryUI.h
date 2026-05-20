@@ -6,13 +6,20 @@
  * the previous session after a crash.
  * * @return true if the user clicks "Restore", false if "Discard".
  */
+
 inline bool promptRestoreSession() {
+#ifdef __EMSCRIPTEN__
+    return false; // Blocking message boxes aren't supported well in WebAssembly
+#else
+    if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
+        if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0) return false;
+    }
+
     const SDL_MessageBoxButtonData buttons[] = {
         { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Restore" },
         { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Discard" },
     };
     
-    // Configure the message box data
     const SDL_MessageBoxData messageboxdata = {
         SDL_MESSAGEBOX_WARNING,
         nullptr,
@@ -21,12 +28,11 @@ inline bool promptRestoreSession() {
         "Would you like to restore your previous pedal chain configuration?",
         SDL_arraysize(buttons),
         buttons,
-        nullptr  
+        nullptr
     };
     
     int buttonid;
-    if (SDL_ShowMessageBox(&messageboxdata, &buttonid) < 0) {
-        return false; 
-    }
+    if (SDL_ShowMessageBox(&messageboxdata, &buttonid) < 0) return false;
     return buttonid == 1;
+#endif
 }
